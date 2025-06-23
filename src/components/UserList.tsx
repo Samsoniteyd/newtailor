@@ -22,14 +22,14 @@ const UserList: React.FC<UserListProps> = ({ users = [], onDelete }) => {
                 </thead>
                 <tbody>
                     {users.map(user => (
-                        <tr key={user.id}>
+                        <tr key={user._id}>
                             <td className="border-b p-2">{user.name}</td>
                             <td className="border-b p-2">{user.email}</td>
                             <td className="border-b p-2">{user.phone}</td>
                             <td className="border-b p-2">
                                 <button 
                                     className="text-blue-500 hover:underline"
-                                    onClick={() => onDelete && onDelete(user.id)}
+                                    onClick={() => onDelete && onDelete(user._id)}
                                 >
                                     Delete
                                 </button>
