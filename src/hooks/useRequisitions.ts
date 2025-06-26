@@ -65,5 +65,6 @@ export const useRequisition = (id: string) => {
     queryKey: ['requisition', id],
     queryFn: () => requisitionService.getRequisition(id),
     enabled: !!id,
+    retry: 1,
   });
 }; 

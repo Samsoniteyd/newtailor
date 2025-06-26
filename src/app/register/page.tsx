@@ -86,7 +86,7 @@ const RegisterPage = () => {
 
   const onSubmit = async (data: RegisterFormInputs) => {
     try {
-      console.log('Form submitted with data:', data); // Debug log
+      console.log('Form submitted with data:', { ...data, password: '[HIDDEN]', confirmPassword: '[HIDDEN]' });
       
       const registerData = {
         name: data.name.trim(),
@@ -95,25 +95,34 @@ const RegisterPage = () => {
         password: data.password,
       };
 
-      console.log('Sending registration data:', registerData); // Debug log
+      console.log('Sending registration data:', { ...registerData, password: '[HIDDEN]' });
 
-      await registerUser(registerData, {
-        onSuccess: () => {
-          setSuccessMessage('Account created successfully! Redirecting...');
-          setTimeout(() => {
-            router.push('/users');
-          }, 1500);
-        },
+      await new Promise<void>((resolve, reject) => {
+        registerUser(registerData, {
+          onSuccess: () => {
+            console.log('Registration successful');
+            setSuccessMessage('Account created successfully! Redirecting...');
+            resolve();
+            setTimeout(() => {
+              router.push('/users');
+            }, 1500);
+          },
+          onError: (error) => {
+            console.error('Registration failed:', error);
+            reject(error);
+          }
+        });
       });
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration submission error:', error);
     }
   };
 
   const getErrorMessage = (error: any) => {
+    if (error instanceof Error) return error.message;
     if (typeof error === 'string') return error;
-    if (error?.message) return error.message;
-    if (error?.response?.data?.message) return error.response.data.message;
+    // if (error?.message) return error.message;
+    // if (error?.response?.data?.message) return error.response.data.message;
     return 'Registration failed. Please try again.';
   };
 
@@ -134,8 +143,8 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="flex items-center justify-center  bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <div className="w-full h-[50%]  max-w-lg">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+      <div className="w-full max-w-lg">
         <form onSubmit={handleSubmit(onSubmit)} className="bg-white p-8 rounded-xl shadow-lg border">
           {/* Header */}
           <div className="text-center mb-8">

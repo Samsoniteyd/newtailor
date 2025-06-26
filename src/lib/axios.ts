@@ -1,13 +1,22 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-// Create axios instance
+const getBaseURL = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_URL || 'https://your-backend-domain.com';
+  }
+  
+  // Base URL without /api since we're adding /api to each route
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-  },
+    'Accept': 'application/json',
+  }
 });
 
 // Request interceptor to add auth token

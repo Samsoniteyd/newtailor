@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -16,6 +17,7 @@ type LoginFormInputs = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const router = useRouter();
   const { login, isLoggingIn, loginError } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormInputs>({
     resolver: zodResolver(loginSchema),
@@ -27,6 +29,10 @@ const LoginPage = () => {
         router.push('/users');
       },
     });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -54,13 +60,27 @@ const LoginPage = () => {
         
         <div className="mb-6">
           <label className="block mb-2 text-sm font-medium" htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            {...register('password')}
-            className={`border ${errors.password ? 'border-red-500' : 'border-gray-300'} p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            disabled={isLoggingIn}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              id="password"
+              {...register('password')}
+              className={`border ${errors.password ? 'border-red-500' : 'border-gray-300'} p-3 w-full pr-12 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              disabled={isLoggingIn}
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-600 hover:text-gray-800 focus:outline-none"
+              disabled={isLoggingIn}
+            >
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+            </button>
+          </div>
           {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>}
         </div>
         

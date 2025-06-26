@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Customer } from "@/types/customer";
 import { Requisition } from "@/types";
 import { requisitionToCustomer } from "@/lib/mappers";
-import { Search, Edit, Trash2 } from "lucide-react";
+import { Search, Edit, Trash2, ChevronLeft, ChevronRight, Filter, SlidersHorizontal } from "lucide-react";
 
 interface CustomerListProps {
   requisitions: Requisition[];
@@ -20,6 +20,11 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
   const [sortBy, setSortBy] = useState('dateOfOrder');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9); // 3x3 grid
 
   // Convert requisitions to customers for display
   const customers = useMemo(() => {
@@ -61,6 +66,18 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
     return filtered;
   }, [customers, searchTerm, sortBy, sortOrder, statusFilter]);
 
+  // Pagination calculations
+  const totalItems = filteredAndSortedCustomers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentCustomers = filteredAndSortedCustomers.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, sortBy, sortOrder]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
@@ -77,35 +94,58 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
   };
 
   const handleEdit = (customer: Customer) => {
-    // Find the original requisition by ID and pass it to onEdit
     const requisition = requisitions.find(req => req._id === customer.id);
     if (requisition) {
       onEdit(requisition);
     }
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
       <Card className="bg-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="h-5 w-5 text-blue-600" />
-            <span>Customer Management</span>
-          </CardTitle>
+        <CardHeader className="pb-3 sm:pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Search className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+              <span className="text-base sm:text-lg">Customer Management</span>
+            </CardTitle>
+            {/* Mobile filter toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="sm:hidden"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Input
-                placeholder="Search by name, email, or phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="flex gap-2">
+        <CardContent className="pt-0">
+          {/* Search Bar - Always visible */}
+          <div className="mb-4">
+            <Input
+              placeholder="Search by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-11"
+            />
+          </div>
+
+          {/* Filters - Collapsible on mobile */}
+          <div className={`space-y-3 sm:space-y-0 ${showFilters ? 'block' : 'hidden sm:block'}`}>
+            {/* Mobile: Stacked filters, Desktop: Horizontal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -118,7 +158,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
               </Select>
               
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -129,7 +169,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
               </Select>
               
               <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,16 +177,51 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
                   <SelectItem value="desc">Descending</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                <SelectTrigger className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6 per page</SelectItem>
+                  <SelectItem value="9">9 per page</SelectItem>
+                  <SelectItem value="12">12 per page</SelectItem>
+                  <SelectItem value="24">24 per page</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Clear filters button */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setSortBy('dateOfOrder');
+                  setSortOrder('desc');
+                  setCurrentPage(1);
+                }}
+                className="h-11"
+              >
+                Clear All
+              </Button>
             </div>
           </div>
 
-          <div className="text-sm text-gray-600 mb-4">
-            Showing {filteredAndSortedCustomers.length} of {customers.length} customers
+          {/* Results info */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm text-gray-600 mb-4 space-y-2 sm:space-y-0">
+            <div>
+              Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} customers
+            </div>
+            {totalPages > 1 && (
+              <div className="text-sm text-gray-500">
+                Page {currentPage} of {totalPages}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {filteredAndSortedCustomers.length === 0 ? (
+      {currentCustomers.length === 0 ? (
         <Card className="bg-white shadow-sm">
           <CardContent className="text-center py-12">
             <p className="text-gray-500 text-lg">No customers found</p>
@@ -154,72 +229,156 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedCustomers.map((customer) => (
-            <Card key={customer.id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">
-                      {customer.name}
-                    </CardTitle>
-                    <div className="space-y-1 mt-2">
-                      {customer.email && (
-                        <p className="text-sm text-gray-600">{customer.email}</p>
-                      )}
-                      {customer.phone && (
-                        <p className="text-sm text-gray-600">{customer.phone}</p>
-                      )}
+        <>
+          {/* Customer Grid - Responsive */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {currentCustomers.map((customer) => (
+              <Card key={customer.id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                        {customer.name}
+                      </CardTitle>
+                      <div className="space-y-1 mt-2">
+                        {customer.email && (
+                          <p className="text-sm text-gray-600 truncate">{customer.email}</p>
+                        )}
+                        {customer.phone && (
+                          <p className="text-sm text-gray-600">{customer.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Badge className={`${getStatusColor(customer.status)} text-xs flex-shrink-0 ml-2`}>
+                      {customer.status.replace('-', ' ').toUpperCase()}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-gray-500">Order Date</p>
+                      <p className="font-medium">{formatDate(customer.dateOfOrder)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Collection Date</p>
+                      <p className="font-medium">{formatDate(customer.dateOfCollection)}</p>
                     </div>
                   </div>
-                  <Badge className={getStatusColor(customer.status)}>
-                    {customer.status.replace('-', ' ').toUpperCase()}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Order Date</p>
-                    <p className="font-medium">{formatDate(customer.dateOfOrder)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Collection Date</p>
-                    <p className="font-medium">{formatDate(customer.dateOfCollection)}</p>
-                  </div>
-                </div>
 
-                {customer.notes && (
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-gray-500">Notes</p>
-                    <p className="text-sm text-gray-700 line-clamp-2">{customer.notes}</p>
-                  </div>
-                )}
+                  {customer.notes && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-gray-500">Notes</p>
+                      <p className="text-sm text-gray-700 line-clamp-2">{customer.notes}</p>
+                    </div>
+                  )}
 
-                <div className="flex justify-end space-x-2 pt-3 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(customer)}
-                    className="flex items-center space-x-1"
-                  >
-                    <Edit className="h-3 w-3" />
-                    <span>Edit</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onDelete(customer.id)}
-                    className="flex items-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    <span>Delete</span>
-                  </Button>
+                  {/* Mobile-friendly buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-3 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(customer)}
+                      className="flex items-center justify-center space-x-1 h-9"
+                    >
+                      <Edit className="h-3 w-3" />
+                      <span>Edit</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDelete(customer.id)}
+                      className="flex items-center justify-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50 h-9"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Delete</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination - Mobile optimized */}
+          {totalPages > 1 && (
+            <Card className="bg-white shadow-sm">
+              <CardContent className="py-4">
+                <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Pagination controls */}
+                  <div className="flex items-center justify-center space-x-1 sm:space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="flex items-center space-x-1 h-9 px-2 sm:px-3"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">Previous</span>
+                    </Button>
+                    
+                    {/* Page numbers - Responsive */}
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                        let pageNumber;
+                        if (totalPages <= 3) {
+                          pageNumber = i + 1;
+                        } else if (currentPage <= 2) {
+                          pageNumber = i + 1;
+                        } else if (currentPage >= totalPages - 1) {
+                          pageNumber = totalPages - 2 + i;
+                        } else {
+                          pageNumber = currentPage - 1 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={currentPage === pageNumber ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(pageNumber)}
+                            className="w-9 h-9 p-0 text-xs sm:text-sm"
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      })}
+                      {totalPages > 3 && currentPage < totalPages - 1 && (
+                        <>
+                          <span className="text-gray-400 px-1">...</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(totalPages)}
+                            className="w-9 h-9 p-0 text-xs sm:text-sm"
+                          >
+                            {totalPages}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center space-x-1 h-9 px-2 sm:px-3"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Total count */}
+                  <div className="text-sm text-gray-500 text-center sm:text-right">
+                    {totalItems} total customers
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );

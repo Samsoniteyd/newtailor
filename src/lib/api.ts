@@ -8,7 +8,7 @@ export const fetchUsers = async (): Promise<User[]> => {
   // This would need to be implemented in your backend
   // For now, return empty array or current user
   try {
-    const response = await api.get<ApiResponse<{ users: User[] }>>('/users');
+    const response = await api.get<ApiResponse<{ users: User[] }>>('/api/users');
     return response.data.data?.users || [];
   } catch (error) {
     // If endpoint doesn't exist, return empty array
@@ -24,7 +24,7 @@ export const createUser = async (userData: {
   password: string;
 }): Promise<User> => {
   // Use the register endpoint for creating users
-  const response = await api.post<ApiResponse<{ user: User }>>('/auth/register', userData);
+  const response = await api.post<ApiResponse<{ user: User }>>('/api/auth/register', userData);
   return response.data.data!.user;
 };
 
@@ -36,24 +36,24 @@ export const updateUser = async (userData: {
 }): Promise<User> => {
   // Use the profile update endpoint
   const { id, ...updateData } = userData;
-  const response = await api.put<ApiResponse<{ user: User }>>('/auth/profile', updateData);
+  const response = await api.put<ApiResponse<{ user: User }>>('/api/auth/profile', updateData);
   return response.data.data!.user;
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
   // Use the profile delete endpoint
-  await api.delete('/auth/profile');
+  await api.delete('/api/auth/profile');
 };
 
 // Additional utility functions
 export const getCurrentUser = async (): Promise<User> => {
-  const response = await api.get<ApiResponse<{ user: User }>>('/auth/profile');
+  const response = await api.get<ApiResponse<{ user: User }>>('/api/auth/profile');
   return response.data.data!.user;
 };
 
 // Additional user API functions you might need
 export const getUserById = async (userId: string): Promise<User> => {
-  const response = await api.get<ApiResponse<{ user: User }>>(`/users/${userId}`);
+  const response = await api.get<ApiResponse<{ user: User }>>(`/api/users/${userId}`);
   return response.data.data!.user;
 };
 
@@ -61,9 +61,9 @@ export const changePassword = async (passwordData: {
   currentPassword: string;
   newPassword: string;
 }): Promise<void> => {
-  await api.put('/auth/change-password', passwordData);
+  await api.put('/api/auth/change-password', passwordData);
 };
 
 export const resetPassword = async (email: string): Promise<void> => {
-  await api.post('/auth/forgot-password', { email });
+  await api.post('/api/auth/forgot-password', { email });
 }; 
