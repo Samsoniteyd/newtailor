@@ -7,38 +7,24 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Mail, Phone, User, Lock, CheckCircle } from 'lucide-react';
 
-// Fixed validation schema
+// Simplified validation schema
 const registerSchema = z.object({
   name: z.string()
     .min(2, 'Name must be at least 2 characters')
     .max(50, 'Name cannot be longer than 50 characters'),
-  contactType: z.enum(['email', 'phone']),
-  email: z.string().email('Please enter a valid email address').optional().or(z.literal('')),
-  phone: z.string().optional().or(z.literal('')),
+  email: z.string()
+    .email('Please enter a valid email address')
+    .min(1, 'Email is required'),
+  phone: z.string()
+    .min(10, 'Phone number must be at least 10 digits')
+    .optional()
+    .or(z.literal('')),
   password: z.string()
     .min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
-}).refine((data) => {
-  // Check if email is provided when contactType is email
-  if (data.contactType === 'email') {
-    return data.email && data.email.length > 0 && data.email.includes('@');
-  }
-  return true;
-}, {
-  message: "Please enter a valid email address",
-  path: ["email"],
-}).refine((data) => {
-  // Check if phone is provided when contactType is phone
-  if (data.contactType === 'phone') {
-    return data.phone && data.phone.length >= 10;
-  }
-  return true;
-}, {
-  message: "Please enter a valid phone number (at least 10 digits)",
-  path: ["phone"],
 });
 
 type RegisterFormInputs = z.infer<typeof registerSchema>;
@@ -48,16 +34,14 @@ const RegisterPage = () => {
   const { register: registerUser, isRegistering, registerError, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [contactType, setContactType] = useState<'email' | 'phone'>('email');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, clearErrors, trigger } = useForm<RegisterFormInputs>({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormInputs>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      contactType: 'email',
+      name: '',
       email: '',
       phone: '',
-      name: '',
       password: '',
       confirmPassword: ''
     }
@@ -70,28 +54,14 @@ const RegisterPage = () => {
     }
   }, [isAuthenticated, router]);
 
-  // Watch contact type changes
-  const watchedContactType = watch('contactType');
-  useEffect(() => {
-    setContactType(watchedContactType);
-    // Clear errors and values when switching contact type
-    if (watchedContactType === 'email') {
-      setValue('phone', '');
-      clearErrors('phone');
-    } else {
-      setValue('email', '');
-      clearErrors('email');
-    }
-  }, [watchedContactType, clearErrors, setValue]);
-
   const onSubmit = async (data: RegisterFormInputs) => {
     try {
       console.log('Form submitted with data:', { ...data, password: '[HIDDEN]', confirmPassword: '[HIDDEN]' });
       
       const registerData = {
         name: data.name.trim(),
-        email: data.contactType === 'email' ? data.email?.trim() : undefined,
-        phone: data.contactType === 'phone' ? data.phone?.trim() : undefined,
+        email: data.email.trim(),
+        phone: data.phone?.trim() || undefined, // Optional phone
         password: data.password,
       };
 
@@ -121,241 +91,213 @@ const RegisterPage = () => {
   const getErrorMessage = (error: any) => {
     if (error instanceof Error) return error.message;
     if (typeof error === 'string') return error;
-    // if (error?.message) return error.message;
-    // if (error?.response?.data?.message) return error.response.data.message;
     return 'Registration failed. Please try again.';
   };
 
-  // Debug: Log current form state
-  console.log('Form errors:', errors);
-  console.log('Is submitting:', isSubmitting);
-  console.log('Is registering:', isRegistering);
-
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Redirecting...</p>
+          <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600 text-sm sm:text-base">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <div className="w-full max-w-lg">
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white p-8 rounded-xl shadow-lg border">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-              <User className="h-8 w-8 text-white" />
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
-            <p className="text-gray-600 mt-2">Join TailorPro and start managing your orders</p>
-          </div>
-
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center text-green-700">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              {successMessage}
-            </div>
-          )}
-          
-          {/* Error Message */}
-          {registerError && !successMessage && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              <p className="text-sm font-medium">Registration Failed</p>
-              <p className="text-sm mt-1">{getErrorMessage(registerError)}</p>
-            </div>
-          )}
-          
-          {/* Name Field */}
-          <div className="mb-6">
-            <label className="block mb-2 text-sm font-medium text-gray-700" htmlFor="name">
-              Full Name
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                id="name"
-                {...register('name')}
-                className={`border ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'} pl-10 pr-4 py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
-                placeholder="Enter your full name"
-                disabled={isSubmitting || isRegistering}
-              />
-            </div>
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
-          </div>
-
-          {/* Contact Type Selection */}
-          <div className="mb-4">
-            <label className="block mb-3 text-sm font-medium text-gray-700">
-              How would you like to sign up?
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setValue('contactType', 'email');
-                  trigger('contactType');
-                }}
-                className={`p-3 rounded-lg border-2 flex items-center justify-center space-x-2 transition-colors ${
-                  contactType === 'email'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
-                disabled={isSubmitting || isRegistering}
-              >
-                <Mail className="h-4 w-4" />
-                <span className="text-sm font-medium">Email</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setValue('contactType', 'phone');
-                  trigger('contactType');
-                }}
-                className={`p-3 rounded-lg border-2 flex items-center justify-center space-x-2 transition-colors ${
-                  contactType === 'phone'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
-                disabled={isSubmitting || isRegistering}
-              >
-                <Phone className="h-4 w-4" />
-                <span className="text-sm font-medium">Phone</span>
-              </button>
-            </div>
-            <input type="hidden" {...register('contactType')} />
-          </div>
-
-          {/* Email/Phone Field */}
-          {contactType === 'email' ? (
-            <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium text-gray-700" htmlFor="email">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="email"
-                  id="email"
-                  {...register('email')}
-                  className={`border ${errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'} pl-10 pr-4 py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
-                  placeholder="Enter your email address"
-                  disabled={isSubmitting || isRegistering}
-                />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Mobile-optimized container */}
+      <div className="flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-md sm:max-w-lg">
+          <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-lg border overflow-hidden">
+            
+            {/* Header - Mobile optimized */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+              <div className="text-center mb-6 sm:mb-8">
+                <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                  <User className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                </div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Create Account</h2>
+                <p className="text-gray-600 mt-1 sm:mt-2 text-xs sm:text-sm lg:text-base">
+                  Join TailorPro and start managing your orders
+                </p>
               </div>
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
             </div>
-          ) : (
-            <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium text-gray-700" htmlFor="phone">
-                Phone Number
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="tel"
-                  id="phone"
-                  {...register('phone')}
-                  className={`border ${errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'} pl-10 pr-4 py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
-                  placeholder="Enter your phone number"
-                  disabled={isSubmitting || isRegistering}
-                />
-              </div>
-              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>}
-            </div>
-          )}
-          
-          {/* Password Field */}
-          <div className="mb-6">
-            <label className="block mb-2 text-sm font-medium text-gray-700" htmlFor="password">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="password"
-                {...register('password')}
-                className={`border ${errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'} pl-10 pr-12 py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
-                placeholder="Create a strong password"
-                disabled={isSubmitting || isRegistering}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                disabled={isSubmitting || isRegistering}
-              >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
-            </div>
-            {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>}
-          </div>
 
-          {/* Confirm Password Field */}
-          <div className="mb-6">
-            <label className="block mb-2 text-sm font-medium text-gray-700" htmlFor="confirmPassword">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                id="confirmPassword"
-                {...register('confirmPassword')}
-                className={`border ${errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'} pl-10 pr-12 py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors`}
-                placeholder="Confirm your password"
-                disabled={isSubmitting || isRegistering}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                disabled={isSubmitting || isRegistering}
-              >
-                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </button>
-            </div>
-            {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword.message}</p>}
-          </div>
-          
-          {/* Submit Button */}
-          <button 
-            type="submit" 
-            disabled={isSubmitting || isRegistering || !!successMessage}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center space-x-2"
-          >
-            {(isSubmitting || isRegistering) ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Creating account...</span>
-              </>
-            ) : (
-              <span>Create Account</span>
-            )}
-          </button>
-          
-          {/* Login Link */}
-          <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+            {/* Form content */}
+            <div className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
+              
+              {/* Success Message */}
+              {successMessage && (
+                <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start text-green-700">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">{successMessage}</span>
+                </div>
+              )}
+              
+              {/* Error Message */}
+              {registerError && !successMessage && (
+                <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                  <p className="text-xs sm:text-sm font-medium">Registration Failed</p>
+                  <p className="text-xs sm:text-sm mt-1">{getErrorMessage(registerError)}</p>
+                </div>
+              )}
+              
+              {/* Name Field */}
+              <div className="mb-4 sm:mb-6">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="name">
+                  Full Name *
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    id="name"
+                    {...register('name')}
+                    className={`border ${
+                      errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    placeholder="Enter your full name"
+                    disabled={isSubmitting || isRegistering}
+                  />
+                </div>
+                {errors.name && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.name.message}</p>}
+              </div>
+
+              {/* Email Field */}
+              <div className="mb-4 sm:mb-6">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="email">
+                  Email Address *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <input
+                    type="email"
+                    id="email"
+                    {...register('email')}
+                    className={`border ${
+                      errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    placeholder="Enter your email address"
+                    disabled={isSubmitting || isRegistering}
+                  />
+                </div>
+                {errors.email && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.email.message}</p>}
+              </div>
+
+              {/* Phone Field */}
+              <div className="mb-4 sm:mb-6">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="phone">
+                  Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    id="phone"
+                    {...register('phone')}
+                    className={`border ${
+                      errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    placeholder="Enter your phone number"
+                    disabled={isSubmitting || isRegistering}
+                  />
+                </div>
+                {errors.phone && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.phone.message}</p>}
+              </div>
+              
+              {/* Password Field */}
+              <div className="mb-4 sm:mb-6">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="password">
+                  Password *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="password"
+                    {...register('password')}
+                    className={`border ${
+                      errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    placeholder="Create a strong password"
+                    disabled={isSubmitting || isRegistering}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1"
+                    disabled={isSubmitting || isRegistering}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  </button>
+                </div>
+                {errors.password && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.password.message}</p>}
+              </div>
+
+              {/* Confirm Password Field */}
+              <div className="mb-6 sm:mb-8">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="confirmPassword">
+                  Confirm Password *
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    id="confirmPassword"
+                    {...register('confirmPassword')}
+                    className={`border ${
+                      errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    placeholder="Confirm your password"
+                    disabled={isSubmitting || isRegistering}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1"
+                    disabled={isSubmitting || isRegistering}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.confirmPassword.message}</p>}
+              </div>
+              
+              {/* Submit Button - Mobile optimized */}
               <button 
-                type="button"
-                onClick={() => router.push('/login')}
-                className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
-                disabled={isSubmitting || isRegistering}
+                type="submit" 
+                disabled={isSubmitting || isRegistering || !!successMessage}
+                className="w-full bg-blue-600 text-white py-3 sm:py-3.5 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm sm:text-base flex items-center justify-center space-x-2 min-h-[44px] sm:min-h-[48px]"
               >
-                Sign in here
+                {(isSubmitting || isRegistering) ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Creating account...</span>
+                  </>
+                ) : (
+                  <span>Create Account</span>
+                )}
               </button>
-            </p>
-          </div>
-        </form>
+              
+              {/* Login Link - Mobile optimized */}
+              <div className="text-center mt-4 sm:mt-6">
+                <p className="text-xs sm:text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <button 
+                    type="button"
+                    onClick={() => router.push('/login')}
+                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+                    disabled={isSubmitting || isRegistering}
+                  >
+                    Sign in here
+                  </button>
+                </p>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
