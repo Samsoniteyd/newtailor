@@ -12,7 +12,17 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 10000,
+  timeout: 15000, // Increased to 15 seconds
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
+});
+
+// Create separate instance for auth requests with shorter timeout
+export const authApi = axios.create({
+  baseURL: getBaseURL(),
+  timeout: 8000, // Shorter timeout for auth requests - they should be fast
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -20,57 +30,73 @@ const api = axios.create({
 });
 
 // Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = Cookies.get('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+const addAuthInterceptor = (instance: typeof api) => {
+  instance.interceptors.request.use(
+    (config) => {
+      const token = Cookies.get('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      // Log request details for debugging
+      console.log(`🌐 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+      
+      return config;
+    },
+    (error) => {
+      console.error('Request error:', error);
+      return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => {
-    console.error('Request error:', error);
-    return Promise.reject(error);
-  }
-);
+  );
+};
 
 // Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    console.error('Response error:', error);
-    
-    // Handle network errors
-    if (!error.response) {
-      console.error('Network error - backend might be down');
-      return Promise.reject({
-        message: 'Unable to connect to server. Please check if the backend is running.',
-        type: 'NETWORK_ERROR'
-      });
-    }
-    
-    // Handle authentication errors
-    if (error.response?.status === 401) {
-      Cookies.remove('token');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+const addResponseInterceptor = (instance: typeof api) => {
+  instance.interceptors.response.use(
+    (response) => {
+      console.log(`✅ Response: ${response.status} ${response.statusText}`);
+      return response;
+    },
+    (error) => {
+      console.error('Axios interceptor - Response error:', error);
+      
+      // Handle timeout errors specifically
+      if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+        console.error('⏱️ Request timeout - backend might be slow or unresponsive');
+        // Don't transform the error here, let auth service handle it
+        return Promise.reject(error);
       }
+      
+      // Handle network errors (no response received)
+      if (!error.response) {
+        console.error('🌐 Network error - backend might be down');
+        // Don't transform the error here, let auth service handle it
+        return Promise.reject(error);
+      }
+
+      // Log response error details
+      console.error(`❌ HTTP ${error.response.status}: ${error.response.statusText}`);
+      console.error('Error data:', error.response.data);
+      
+      // Handle authentication errors for non-auth endpoints
+      if (error.response?.status === 401 && !error.config?.url?.includes('/auth/')) {
+        console.log('🔒 Unauthorized access to protected resource, removing token');
+        Cookies.remove('token');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      
+      // Don't transform errors here - let individual services handle their own error formatting
+      return Promise.reject(error);
     }
-    
-    // Handle server errors
-    if (error.response?.status >= 500) {
-      console.error('Server error:', error.response.data);
-      return Promise.reject({
-        message: 'Server error occurred. Please try again later.',
-        type: 'SERVER_ERROR',
-        details: error.response.data
-      });
-    }
-    
-    return Promise.reject(error);
-  }
-);
+  );
+};
+
+// Apply interceptors to both instances
+addAuthInterceptor(api);
+addAuthInterceptor(authApi);
+addResponseInterceptor(api);
+addResponseInterceptor(authApi);
 
 export default api; 

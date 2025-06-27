@@ -8,7 +8,7 @@ import CustomerList from "@/components/CustomerList";
 import CustomerForm from '@/components/CustomerForm';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Customer } from "@/types/customer";
-import { Users, PlusCircle, Scissors, Calendar, LogOut, Menu, X } from "lucide-react";
+import { Users, PlusCircle, Scissors, Calendar, LogOut, Menu, X, CheckCircle } from "lucide-react";
 import { useRequisitions } from '../../hooks/useRequisitions';
 import { useAuth } from '../../hooks/useAuth';
 import { customerToRequisition, requisitionToCustomer } from '../../lib/mappers';
@@ -30,6 +30,7 @@ const UsersPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Convert requisitions to customers for display
   const customers = requisitions ? requisitions.map(requisitionToCustomer) : [];
@@ -68,6 +69,12 @@ const UsersPage = () => {
     }
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    logout();
+    // The useAuth hook will handle the redirect after showing the toast
+  };
+
   const stats = {
     totalCustomers: customers.length,
     pendingOrders: customers.filter(c => c.status === 'pending').length,
@@ -97,7 +104,7 @@ const UsersPage = () => {
             <div className="flex items-center justify-between py-3 sm:py-4">
               {/* Logo and brand */}
               <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
+                <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg cursor-pointer">
                   <Scissors className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div>
@@ -114,6 +121,7 @@ const UsersPage = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="cursor-pointer"
                 >
                   {mobileMenuOpen ? (
                     <X className="h-5 w-5" />
@@ -125,17 +133,27 @@ const UsersPage = () => {
 
               {/* Desktop navigation */}
               <div className="hidden sm:flex items-center space-x-4">
-                <Badge variant="outline" className="text-blue-600 border-blue-600 text-xs sm:text-sm">
+                <Badge variant="outline" className="text-blue-600 border-blue-600 text-xs sm:text-sm cursor-default">
                   Professional Edition
                 </Badge>
                 <Button
                   variant="outline"
-                  onClick={logout}
-                  className="flex items-center space-x-2 text-sm"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center space-x-2 text-sm cursor-pointer"
                   size="sm"
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden lg:inline">Logout</span>
+                  {isLoggingOut ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      <span className="hidden lg:inline">Logging out...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="h-4 w-4" />
+                      <span className="hidden lg:inline">Logout</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -146,20 +164,30 @@ const UsersPage = () => {
                 <div className="pt-3 space-y-3">
                   <p className="text-sm text-gray-600 px-1">Welcome, {user?.name}</p>
                   <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-blue-600 border-blue-600 text-xs">
+                    <Badge variant="outline" className="text-blue-600 border-blue-600 text-xs cursor-default">
                       Professional Edition
                     </Badge>
                     <Button
                       variant="outline"
                       onClick={() => {
-                        logout();
+                        handleLogout();
                         setMobileMenuOpen(false);
                       }}
-                      className="flex items-center space-x-2"
+                      disabled={isLoggingOut}
+                      className="flex items-center space-x-2 cursor-pointer"
                       size="sm"
                     >
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
+                      {isLoggingOut ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                          <span>Logging out...</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogOut className="h-4 w-4" />
+                          <span>Logout</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -173,13 +201,13 @@ const UsersPage = () => {
             {/* Mobile-optimized tabs */}
             <div className="w-full overflow-x-auto">
               <TabsList className="grid w-full grid-cols-3 min-w-[300px] sm:w-auto lg:w-[400px] h-11 sm:h-auto">
-                <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-4">
+                <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-4 cursor-pointer">
                   Overview
                 </TabsTrigger>
-                <TabsTrigger value="customers" className="text-xs sm:text-sm px-2 sm:px-4">
+                <TabsTrigger value="customers" className="text-xs sm:text-sm px-2 sm:px-4 cursor-pointer">
                   Customers
                 </TabsTrigger>
-                <TabsTrigger value="new-customer" className="text-xs sm:text-sm px-1 sm:px-4">
+                <TabsTrigger value="new-customer" className="text-xs sm:text-sm px-1 sm:px-4 cursor-pointer">
                   <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">New Order</span>
                   <span className="sm:hidden">New</span>
@@ -255,7 +283,7 @@ const UsersPage = () => {
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <Button 
                       onClick={() => setActiveTab("new-customer")}
-                      className="bg-blue-600 hover:bg-blue-700 h-11 flex-1 sm:flex-initial"
+                      className="bg-blue-600 hover:bg-blue-700 h-11 flex-1 sm:flex-initial cursor-pointer"
                       disabled={isCreating}
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
@@ -264,7 +292,7 @@ const UsersPage = () => {
                     <Button 
                       variant="outline" 
                       onClick={() => setActiveTab("customers")}
-                      className="h-11 flex-1 sm:flex-initial"
+                      className="h-11 flex-1 sm:flex-initial cursor-pointer"
                     >
                       View All Customers
                     </Button>

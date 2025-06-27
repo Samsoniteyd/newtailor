@@ -111,7 +111,7 @@ export default function EditUserPage() {
               </div>
               <Button 
                 onClick={() => router.push('/users')}
-                className="w-full sm:w-auto h-11 bg-blue-600 hover:bg-blue-700"
+                className="w-full sm:w-auto h-11 bg-blue-600 hover:bg-blue-700 cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Customers
@@ -153,7 +153,7 @@ export default function EditUserPage() {
               variant="ghost"
               size="sm"
               onClick={handleCancel}
-              className="mr-3 p-2"
+              className="mr-3 p-2 cursor-pointer"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -173,7 +173,7 @@ export default function EditUserPage() {
               <Button
                 variant="outline"
                 onClick={handleCancel}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Back to Customers</span>

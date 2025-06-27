@@ -31,12 +31,13 @@ type RegisterFormInputs = z.infer<typeof registerSchema>;
 
 const RegisterPage = () => {
   const router = useRouter();
-  const { register: registerUser, isRegistering, registerError, isAuthenticated } = useAuth();
+  const { register: registerUser, isRegistering, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [registerError, setRegisterError] = useState<string>('');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormInputs>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm<RegisterFormInputs>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '',
@@ -56,22 +57,27 @@ const RegisterPage = () => {
 
   const onSubmit = async (data: RegisterFormInputs) => {
     try {
-      console.log('Form submitted with data:', { ...data, password: '[HIDDEN]', confirmPassword: '[HIDDEN]' });
+      // Clear previous errors
+      setRegisterError('');
       
       const registerData = {
         name: data.name.trim(),
         email: data.email.trim(),
-        phone: data.phone?.trim() || undefined, // Optional phone
+        phone: data.phone?.trim() || undefined,
         password: data.password,
       };
-
-      console.log('Sending registration data:', { ...registerData, password: '[HIDDEN]' });
 
       await new Promise<void>((resolve, reject) => {
         registerUser(registerData, {
           onSuccess: () => {
             console.log('Registration successful');
             setSuccessMessage('Account created successfully! Redirecting...');
+            // Clear form only on success
+            setValue('name', '');
+            setValue('email', '');
+            setValue('phone', '');
+            setValue('password', '');
+            setValue('confirmPassword', '');
             resolve();
             setTimeout(() => {
               router.push('/users');
@@ -79,6 +85,11 @@ const RegisterPage = () => {
           },
           onError: (error) => {
             console.error('Registration failed:', error);
+            // Set error but DON'T clear form
+            setRegisterError(error.message || 'Registration failed. Please try again.');
+            // Optionally clear only passwords on registration failure
+            setValue('password', '');
+            setValue('confirmPassword', '');
             reject(error);
           }
         });
@@ -146,18 +157,18 @@ const RegisterPage = () => {
               
               {/* Name Field */}
               <div className="mb-4 sm:mb-6">
-                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="name">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700 cursor-pointer" htmlFor="name">
                   Full Name *
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 pointer-events-none" />
                   <input
                     type="text"
                     id="name"
                     {...register('name')}
                     className={`border ${
                       errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base cursor-text`}
                     placeholder="Enter your full name"
                     disabled={isSubmitting || isRegistering}
                   />
@@ -167,18 +178,18 @@ const RegisterPage = () => {
 
               {/* Email Field */}
               <div className="mb-4 sm:mb-6">
-                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="email">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700 cursor-pointer" htmlFor="email">
                   Email Address *
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 pointer-events-none" />
                   <input
                     type="email"
                     id="email"
                     {...register('email')}
                     className={`border ${
                       errors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base cursor-text`}
                     placeholder="Enter your email address"
                     disabled={isSubmitting || isRegistering}
                   />
@@ -188,18 +199,18 @@ const RegisterPage = () => {
 
               {/* Phone Field */}
               <div className="mb-4 sm:mb-6">
-                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="phone">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700 cursor-pointer" htmlFor="phone">
                   Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 pointer-events-none" />
                   <input
                     type="tel"
                     id="phone"
                     {...register('phone')}
                     className={`border ${
                       errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    } pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base cursor-text`}
                     placeholder="Enter your phone number"
                     disabled={isSubmitting || isRegistering}
                   />
@@ -209,25 +220,25 @@ const RegisterPage = () => {
               
               {/* Password Field */}
               <div className="mb-4 sm:mb-6">
-                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="password">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700 cursor-pointer" htmlFor="password">
                   Password *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 pointer-events-none" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     id="password"
                     {...register('password')}
                     className={`border ${
                       errors.password ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base cursor-text`}
                     placeholder="Create a strong password"
                     disabled={isSubmitting || isRegistering}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1 cursor-pointer"
                     disabled={isSubmitting || isRegistering}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -238,25 +249,25 @@ const RegisterPage = () => {
 
               {/* Confirm Password Field */}
               <div className="mb-6 sm:mb-8">
-                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700" htmlFor="confirmPassword">
+                <label className="block mb-2 text-xs sm:text-sm font-medium text-gray-700 cursor-pointer" htmlFor="confirmPassword">
                   Confirm Password *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 pointer-events-none" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     id="confirmPassword"
                     {...register('confirmPassword')}
                     className={`border ${
                       errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base`}
+                    } pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 w-full rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors text-sm sm:text-base cursor-text`}
                     placeholder="Confirm your password"
                     disabled={isSubmitting || isRegistering}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors p-1 cursor-pointer"
                     disabled={isSubmitting || isRegistering}
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -269,7 +280,7 @@ const RegisterPage = () => {
               <button 
                 type="submit" 
                 disabled={isSubmitting || isRegistering || !!successMessage}
-                className="w-full bg-blue-600 text-white py-3 sm:py-3.5 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm sm:text-base flex items-center justify-center space-x-2 min-h-[44px] sm:min-h-[48px]"
+                className="w-full bg-blue-600 text-white py-3 sm:py-3.5 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm sm:text-base flex items-center justify-center space-x-2 min-h-[44px] sm:min-h-[48px] cursor-pointer"
               >
                 {(isSubmitting || isRegistering) ? (
                   <>
@@ -288,7 +299,7 @@ const RegisterPage = () => {
                   <button 
                     type="button"
                     onClick={() => router.push('/login')}
-                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors"
+                    className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors cursor-pointer"
                     disabled={isSubmitting || isRegistering}
                   >
                     Sign in here
