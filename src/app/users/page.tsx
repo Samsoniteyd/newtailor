@@ -11,11 +11,13 @@ import { Customer } from "@/types/customer";
 import { Users, PlusCircle, Scissors, Calendar, LogOut, Menu, X, CheckCircle, Eye, Edit, Trash2 } from "lucide-react";
 import { useRequisitions } from '../../hooks/useRequisitions';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { customerToRequisition, requisitionToCustomer } from '../../lib/mappers';
 import { Requisition } from '@/types';
 
 const UsersPage = () => {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const { 
     requisitions, 
     isLoading, 
@@ -47,6 +49,11 @@ const UsersPage = () => {
           onSuccess: () => {
             setEditingCustomer(null);
             setActiveTab("customers");
+            toast({
+              variant: "success",
+              title: "Customer Updated Successfully!",
+              description: `${customer.name}'s details have been updated successfully.`,
+            });
           }
         }
       );
@@ -54,6 +61,11 @@ const UsersPage = () => {
       createRequisition(requisitionData, {
         onSuccess: () => {
           setActiveTab("customers");
+          toast({
+            variant: "success",
+            title: "New Customer Created Successfully!",
+            description: `${customer.name}'s measurements and details have been saved successfully.`,
+          });
         }
       });
     }
