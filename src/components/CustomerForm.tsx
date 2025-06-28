@@ -7,16 +7,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Customer } from "@/types/customer";
-import { Save, X } from "lucide-react";
+import { Save, X, Search } from "lucide-react";
 
 interface CustomerFormProps {
   customer?: Customer | null;
+  customers?: Customer[];
   onSave: (customer: Customer) => void;
   onCancel: () => void;
 }
 
-const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel }) => {
+const CustomerForm: React.FC<CustomerFormProps> = ({ customer, customers = [], onSave, onCancel }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  
   const [formData, setFormData] = useState<Omit<Customer, 'id' | 'createdAt'>>({
+    title: '',
     name: '',
     email: '',
     phone: '',
@@ -50,8 +56,91 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
   });
 
   useEffect(() => {
+    if (searchTerm.trim()) {
+      const results = customers.filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setSearchResults(results);
+      setShowSearchResults(results.length > 0);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  }, [searchTerm, customers]);
+
+  const clearForm = () => {
+    setFormData({
+      title: '',
+      name: '',
+      email: '',
+      phone: '',
+      dateOfOrder: new Date().toISOString().split('T')[0],
+      dateOfCollection: '',
+      status: 'pending',
+      measurements: {
+        tops: {
+          chest: '',
+          shoulders: '',
+          sleeveLength: '',
+          sleeveLengthShort: '',
+          topLength: '',
+          neck: '',
+          tommy: '',
+          hip: ''
+        },
+        trouser: {
+          waist: '',
+          length: '',
+          lap: '',
+          hip: '',
+          base: ''
+        },
+        agbada: {
+          length: '',
+          sleeve: ''
+        }
+      },
+      notes: ''
+    });
+    setSearchTerm('');
+    setShowSearchResults(false);
+  };
+
+  const loadCustomerData = (selectedCustomer: Customer) => {
+    setFormData({
+      title: selectedCustomer.title || '',
+      name: selectedCustomer.name,
+      email: selectedCustomer.email || '',
+      phone: selectedCustomer.phone || '',
+      dateOfOrder: new Date().toISOString().split('T')[0],
+      dateOfCollection: '',
+      status: 'pending',
+      measurements: selectedCustomer.measurements,
+      notes: selectedCustomer.notes || ''
+    });
+    setSearchTerm('');
+    setShowSearchResults(false);
+  };
+
+  const isFormValid = () => {
+    if (!formData.name.trim() || !formData.dateOfOrder) {
+      return false;
+    }
+
+    const allMeasurements = [
+      ...Object.values(formData.measurements.tops),
+      ...Object.values(formData.measurements.trouser),
+      ...Object.values(formData.measurements.agbada)
+    ];
+
+    return allMeasurements.every(measurement => measurement.trim() !== '');
+  };
+
+  useEffect(() => {
     if (customer) {
       setFormData({
+        title: customer.title || '',
         name: customer.name,
         email: customer.email || '',
         phone: customer.phone || '',
@@ -91,7 +180,12 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
       id: customer?.id || '',
       createdAt: customer?.createdAt || new Date().toISOString()
     };
+    
     onSave(customerData);
+    
+    if (!customer) {
+      clearForm();
+    }
   };
 
   return (
@@ -103,7 +197,6 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
               <CardTitle className="text-lg sm:text-xl font-bold text-gray-800">
                 DETAILED REQUISITION CARD
               </CardTitle>
-              {/* Mobile close button */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -116,13 +209,59 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Customer Information */}
+              {!customer && (
+                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800">
+                    Search Existing Customer
+                  </h3>
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by name or email..."
+                        className="pl-10 h-11 border-gray-300"
+                      />
+                    </div>
+                    
+                    {showSearchResults && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {searchResults.map((result) => (
+                          <div
+                            key={result.id}
+                            onClick={() => loadCustomerData(result)}
+                            className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">{result.name}</div>
+                            {result.email && <div className="text-sm text-gray-600">{result.email}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Search to load existing customer measurements, or fill out the form below for a new customer.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b pb-2">
                   Customer Information
                 </h3>
                 
-                {/* Mobile-first stacked layout, responsive grid for larger screens */}
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm font-medium">Title</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    placeholder="e.g., Mr., Mrs., Dr."
+                    className="border-gray-300 h-11"
+                  />
+                </div>
+                
                 <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm font-medium">Name *</Label>
@@ -196,15 +335,17 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
 
               <Separator />
 
-              {/* Measurements Section */}
               <div className="space-y-6">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b pb-2">
-                  Measurements
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b pb-2 sm:border-b-0 sm:pb-0">
+                    Measurements
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1 sm:mt-0">
+                    * All fields required. Enter "0" for measurements not needed.
+                  </p>
+                </div>
                 
-                {/* Mobile: Stack all measurement cards, Desktop: Side by side */}
                 <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6">
-                  {/* TOPS */}
                   <Card className="border border-gray-200">
                     <CardHeader className="pb-3 px-4">
                       <CardTitle className="text-base sm:text-lg font-semibold bg-gray-100 px-3 py-2 rounded">
@@ -221,14 +362,13 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                             value={value}
                             onChange={(e) => handleMeasurementChange('tops', key, e.target.value)}
                             className="h-9 sm:h-8 border-gray-300"
-                            placeholder="inches"
+                            placeholder="inches or 0"
                           />
                         </div>
                       ))}
                     </CardContent>
                   </Card>
 
-                  {/* TROUSER/SKIRT */}
                   <Card className="border border-gray-200">
                     <CardHeader className="pb-3 px-4">
                       <CardTitle className="text-base sm:text-lg font-semibold bg-gray-100 px-3 py-2 rounded">
@@ -245,7 +385,7 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                             value={value}
                             onChange={(e) => handleMeasurementChange('trouser', key, e.target.value)}
                             className="h-9 sm:h-8 border-gray-300"
-                            placeholder="inches"
+                            placeholder="inches or 0"
                           />
                         </div>
                       ))}
@@ -253,7 +393,6 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                   </Card>
                 </div>
 
-                {/* AGBADA - Full width */}
                 <Card className="border border-gray-200">
                   <CardHeader className="pb-3 px-4">
                     <CardTitle className="text-base sm:text-lg font-semibold bg-gray-100 px-3 py-2 rounded">
@@ -271,7 +410,7 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                             value={value}
                             onChange={(e) => handleMeasurementChange('agbada', key, e.target.value)}
                             className="h-9 sm:h-8 border-gray-300"
-                            placeholder="inches"
+                            placeholder="inches or 0"
                           />
                         </div>
                       ))}
@@ -280,7 +419,6 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                 </Card>
               </div>
 
-              {/* Notes */}
               <div className="space-y-2">
                 <Label htmlFor="notes" className="text-sm font-medium">Additional Notes</Label>
                 <Textarea
@@ -293,7 +431,6 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                 />
               </div>
 
-              {/* Action Buttons - Mobile responsive */}
               <div className="pt-4 border-t">
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 sm:gap-4">
                   <Button 
@@ -306,11 +443,22 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSave, onCancel 
                   </Button>
                   <Button 
                     type="submit" 
-                    className="w-full sm:w-auto h-11 bg-blue-600 hover:bg-blue-700"
+                    disabled={!isFormValid()}
+                    className="w-full sm:w-auto h-11 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     Save Customer
                   </Button>
+                  {!customer && (
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={clearForm}
+                      className="w-full sm:w-auto h-11"
+                    >
+                      Clear Form
+                    </Button>
+                  )}
                 </div>
               </div>
             </form>

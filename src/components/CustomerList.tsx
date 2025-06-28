@@ -7,38 +7,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Customer } from "@/types/customer";
 import { Requisition } from "@/types";
 import { requisitionToCustomer } from "@/lib/mappers";
-import { Search, Edit, Trash2, ChevronLeft, ChevronRight, Filter, SlidersHorizontal } from "lucide-react";
+import { Search, Edit, Trash2, ChevronLeft, ChevronRight, Filter, SlidersHorizontal, Eye, Grid3X3, List } from "lucide-react";
 
 interface CustomerListProps {
   requisitions: Requisition[];
   onEdit: (requisition: Requisition) => void;
+  onView: (requisitions: Requisition[]) => void;
   onDelete: (id: string) => void;
 }
 
-const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDelete }) => {
+interface GroupedCustomer {
+  name: string;
+  email: string;
+  phone: string;
+  measurementCount: number;
+  latestOrder: Customer;
+  allRequisitions: Requisition[];
+}
+
+const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onView, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('dateOfOrder');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(9); // 3x3 grid
+  const [itemsPerPage, setItemsPerPage] = useState(9);
 
-  // Convert requisitions to customers for display
-  const customers = useMemo(() => {
-    return requisitions.map(requisitionToCustomer);
+  // Group customers by name and email
+  const groupedCustomers = useMemo(() => {
+    const customers = requisitions.map(requisitionToCustomer);
+    const customerMap = new Map<string, GroupedCustomer>();
+
+    customers.forEach(customer => {
+      const key = `${customer.name.toLowerCase()}-${(customer.email || '').toLowerCase()}`;
+      const requisition = requisitions.find(req => req._id === customer.id);
+      
+      if (customerMap.has(key)) {
+        const existing = customerMap.get(key)!;
+        existing.measurementCount += 1;
+        existing.allRequisitions.push(requisition!);
+        
+        // Update with latest order if this one is more recent
+        if (new Date(customer.dateOfOrder) > new Date(existing.latestOrder.dateOfOrder)) {
+          existing.latestOrder = customer;
+          existing.phone = customer.phone || existing.phone;
+        }
+      } else {
+        customerMap.set(key, {
+          name: customer.name,
+          email: customer.email || '',
+          phone: customer.phone || '',
+          measurementCount: 1,
+          latestOrder: customer,
+          allRequisitions: [requisition!]
+        });
+      }
+    });
+
+    return Array.from(customerMap.values());
   }, [requisitions]);
 
   const filteredAndSortedCustomers = useMemo(() => {
-    let filtered = customers.filter(customer => {
+    let filtered = groupedCustomers.filter(customer => {
       const matchesSearch = 
         customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (customer.phone && customer.phone.includes(searchTerm));
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.phone.includes(searchTerm);
       
-      const matchesStatus = statusFilter === 'all' || customer.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || customer.latestOrder.status === statusFilter;
       
       return matchesSearch && matchesStatus;
     });
@@ -51,11 +91,11 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
         aValue = a.name;
         bValue = b.name;
       } else if (sortBy === 'dateOfOrder') {
-        aValue = new Date(a.dateOfOrder);
-        bValue = new Date(b.dateOfOrder);
+        aValue = new Date(a.latestOrder.dateOfOrder);
+        bValue = new Date(b.latestOrder.dateOfOrder);
       } else if (sortBy === 'dateOfCollection') {
-        aValue = new Date(a.dateOfCollection || '9999-12-31');
-        bValue = new Date(b.dateOfCollection || '9999-12-31');
+        aValue = new Date(a.latestOrder.dateOfCollection || '9999-12-31');
+        bValue = new Date(b.latestOrder.dateOfCollection || '9999-12-31');
       }
 
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
@@ -64,7 +104,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
     });
 
     return filtered;
-  }, [customers, searchTerm, sortBy, sortOrder, statusFilter]);
+  }, [groupedCustomers, searchTerm, sortBy, sortOrder, statusFilter]);
 
   // Pagination calculations
   const totalItems = filteredAndSortedCustomers.length;
@@ -93,11 +133,21 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
     return new Date(dateString).toLocaleDateString();
   };
 
-  const handleEdit = (customer: Customer) => {
-    const requisition = requisitions.find(req => req._id === customer.id);
+  const handleEdit = (customer: GroupedCustomer) => {
+    // Edit the latest order
+    const requisition = customer.allRequisitions.find(req => req._id === customer.latestOrder.id);
     if (requisition) {
       onEdit(requisition);
     }
+  };
+
+  const handleView = (customer: GroupedCustomer) => {
+    onView(customer.allRequisitions);
+  };
+
+  const handleDelete = (customer: GroupedCustomer) => {
+    // Delete the latest order
+    onDelete(customer.latestOrder.id);
   };
 
   const handlePageChange = (page: number) => {
@@ -118,15 +168,63 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
               <Search className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
               <span className="text-base sm:text-lg">Customer Management</span>
             </CardTitle>
-            {/* Mobile filter toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="sm:hidden"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-            </Button>
+            
+            {/* View toggles and mobile filter toggle */}
+            <div className="flex items-center space-x-2">
+              {/* View Type Toggle - Desktop */}
+              <div className="hidden sm:flex items-center border rounded-lg p-1 bg-gray-50">
+                <Button
+                  variant={viewType === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewType('grid')}
+                  className="h-8 px-3"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewType === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewType('list')}
+                  className="h-8 px-3"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Mobile filter toggle */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="sm:hidden"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Mobile View Toggle */}
+          <div className="flex sm:hidden justify-center mt-3">
+            <div className="flex items-center border rounded-lg p-1 bg-gray-50">
+              <Button
+                variant={viewType === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewType('grid')}
+                className="h-8 px-3 text-xs"
+              >
+                <Grid3X3 className="h-4 w-4 mr-1" />
+                Grid
+              </Button>
+              <Button
+                variant={viewType === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewType('list')}
+                className="h-8 px-3 text-xs"
+              >
+                <List className="h-4 w-4 mr-1" />
+                List
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
@@ -230,74 +328,179 @@ const CustomerList: React.FC<CustomerListProps> = ({ requisitions, onEdit, onDel
         </Card>
       ) : (
         <>
-          {/* Customer Grid - Responsive */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {currentCustomers.map((customer) => (
-              <Card key={customer.id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0 flex-1">
-                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                        {customer.name}
-                      </CardTitle>
-                      <div className="space-y-1 mt-2">
-                        {customer.email && (
-                          <p className="text-sm text-gray-600 truncate">{customer.email}</p>
-                        )}
-                        {customer.phone && (
-                          <p className="text-sm text-gray-600">{customer.phone}</p>
+          {/* Customer Display - Grid or List View */}
+          {viewType === 'grid' ? (
+            // Grid View
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {currentCustomers.map((customer, index) => (
+                <Card key={`${customer.name}-${customer.email}-${index}`} className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                          {customer.name}
+                        </CardTitle>
+                        <div className="space-y-1 mt-2">
+                          {customer.email && (
+                            <p className="text-sm text-gray-600 truncate">{customer.email}</p>
+                          )}
+                          {customer.phone && (
+                            <p className="text-sm text-gray-600">{customer.phone}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-2">
+                        <Badge className={`${getStatusColor(customer.latestOrder.status)} text-xs flex-shrink-0`}>
+                          {customer.latestOrder.status.replace('-', ' ').toUpperCase()}
+                        </Badge>
+                        {customer.measurementCount > 1 && (
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                            {customer.measurementCount} orders
+                          </Badge>
                         )}
                       </div>
                     </div>
-                    <Badge className={`${getStatusColor(customer.status)} text-xs flex-shrink-0 ml-2`}>
-                      {customer.status.replace('-', ' ').toUpperCase()}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500">Order Date</p>
-                      <p className="font-medium">{formatDate(customer.dateOfOrder)}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-500">Latest Order</p>
+                        <p className="font-medium">{formatDate(customer.latestOrder.dateOfOrder)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Collection Date</p>
+                        <p className="font-medium">{formatDate(customer.latestOrder.dateOfCollection)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-gray-500">Collection Date</p>
-                      <p className="font-medium">{formatDate(customer.dateOfCollection)}</p>
-                    </div>
-                  </div>
 
-                  {customer.notes && (
-                    <div className="pt-2 border-t">
-                      <p className="text-xs text-gray-500">Notes</p>
-                      <p className="text-sm text-gray-700 line-clamp-2">{customer.notes}</p>
-                    </div>
-                  )}
+                    {customer.latestOrder.notes && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-gray-500">Latest Notes</p>
+                        <p className="text-sm text-gray-700 line-clamp-2">{customer.latestOrder.notes}</p>
+                      </div>
+                    )}
 
-                  {/* Mobile-friendly buttons */}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-3 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(customer)}
-                      className="flex items-center justify-center space-x-1 h-9"
-                    >
-                      <Edit className="h-3 w-3" />
-                      <span>Edit</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onDelete(customer.id)}
-                      className="flex items-center justify-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50 h-9"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Delete</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    {/* Mobile-friendly buttons */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleView(customer)}
+                        className="flex items-center justify-center space-x-1 h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>View {customer.measurementCount > 1 ? 'All' : ''}</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(customer)}
+                        className="flex items-center justify-center space-x-1 h-9"
+                      >
+                        <Edit className="h-3 w-3" />
+                        <span>Edit Latest</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(customer)}
+                        className="flex items-center justify-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50 h-9"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Delete</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            // List View
+            <div className="space-y-3">
+              {currentCustomers.map((customer, index) => (
+                <Card key={`${customer.name}-${customer.email}-${index}`} className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      {/* Customer Info */}
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-semibold text-gray-900 truncate">{customer.name}</h3>
+                            {customer.measurementCount > 1 && (
+                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                {customer.measurementCount}
+                              </Badge>
+                            )}
+                          </div>
+                          {customer.email && (
+                            <p className="text-sm text-gray-600 truncate">{customer.email}</p>
+                          )}
+                          {customer.phone && (
+                            <p className="text-sm text-gray-600">{customer.phone}</p>
+                          )}
+                        </div>
+                        
+                        <div className="text-sm">
+                          <p className="text-gray-500">Latest Order</p>
+                          <p className="font-medium">{formatDate(customer.latestOrder.dateOfOrder)}</p>
+                        </div>
+                        
+                        <div className="text-sm">
+                          <p className="text-gray-500">Collection Date</p>
+                          <p className="font-medium">{formatDate(customer.latestOrder.dateOfCollection)}</p>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <Badge className={`${getStatusColor(customer.latestOrder.status)} text-xs`}>
+                            {customer.latestOrder.status.replace('-', ' ').toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-row gap-2 sm:flex-col lg:flex-row">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleView(customer)}
+                          className="flex items-center space-x-1 h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span className="hidden sm:inline">View {customer.measurementCount > 1 ? 'All' : ''}</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(customer)}
+                          className="flex items-center space-x-1 h-8"
+                        >
+                          <Edit className="h-3 w-3" />
+                          <span className="hidden sm:inline">Edit</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(customer)}
+                          className="flex items-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50 h-8"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Notes in list view */}
+                    {customer.latestOrder.notes && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-gray-500">Latest Notes</p>
+                        <p className="text-sm text-gray-700 line-clamp-2">{customer.latestOrder.notes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Pagination - Mobile optimized */}
           {totalPages > 1 && (
